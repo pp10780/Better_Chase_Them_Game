@@ -5,8 +5,8 @@
  * draw_player()
  *
  * Arguments: win - window display for the map
-              player - struct with player information
-              delete - flag that indicate if it is to draw or delete  
+ *            player - struct with player information
+ *            delete - flag that indicate if it is to draw or delete  
  * Returns: 
  *
  * Description: Draws/deletes a player on the display window 
@@ -129,9 +129,6 @@ void* bots_thread()
 	}
 }
 
-
-
-
 void init_map()
 {
 	initscr();		    	/* Start curses mode 		*/
@@ -151,10 +148,68 @@ void init_map()
 
 void* client_thread(void * arg)
 {
-	int index = *(int*) arg;
+	int tmp_fd = *(int*) arg;
+	int index;
+
 	while(1)
 	{
-		//draw_map();
+		err = read(tmp_fd, &msg_rcv, sizeof(msg_rcv));
+		if(err == -1)
+		{
+			fprintf(stderr, "error: %s\n", strerror(errno));            
+			exit(0);
+		}
+		if(msg_rcv.type == Connect){
+			//printf("Connect\n");
+			//if id recieved is invalid send message to the client to try again
+			if(!check_ID_val(field_status.user, msg_rcv.id))
+			{
+				invalid_id.id = '-';
+				err = write(tmp_fd,
+						&invalid_id, sizeof(invalid_id));
+				if(err == -1)
+				{
+					fprintf(stderr, "error: %s\n", strerror(errno));            
+					exit(0);
+				}
+					
+			}
+			else
+			{
+				//if id is valid create a user
+				index = create_user(field_status.user, map, msg_rcv.id, tmp_fd);
+				//if server full send message to the client to try again later
+				if(index == N_Max_Players)
+				{
+					invalid_id.id = '/';
+					err = write(tmp_fd,
+						&invalid_id, sizeof(invalid_id));
+					if(err == -1)
+					{
+						fprintf(stderr, "error: %s\n", strerror(errno));            
+						exit(0);
+					}
+				}
+				//if server not full send ball information to the client
+				else
+				{
+					err = write(tmp_fd,
+						&field_status.user[index], sizeof(field_status.user[index]));
+					if(err == -1)
+					{
+						fprintf(stderr, "error: %s\n", strerror(errno));            
+						exit(0);
+					}
+					break;
+				}
+			}
+		}
+		
+	}
+
+	while(1)
+	{
+		draw_map();
 		//if the health of the client trying to move alredy reached 0 send Health_0 message for it to disconnect and delete the user from the game
 		err = read(field_status.user[index].fd, &msg_rcv, sizeof(msg_rcv));
 		if(err == -1)
@@ -212,7 +267,7 @@ void* client_thread(void * arg)
 
 int main(int argc, char** argv){
 	
-	pthread_t prize_id, bot_id, client_id[N_Max_Players];
+	pthread_t prize_id, bot_id, client_id;
 	if(argc != 4)
     {
         printf("Invalid input arguments\nFORMAT: ./{EXECUTABLE} {IP_ADDRESS} {PORT} {N_BOTS}\n");
@@ -256,60 +311,8 @@ int main(int argc, char** argv){
 		}
 
 		client_fd = accept(sock_fd, (struct sockaddr *)&local_addr, &local_addr_size);
-
-		//printf("Waiting...\n");
-		err = read(client_fd, &msg_rcv, sizeof(msg_rcv));
-		if(err == -1)
-        {
-            fprintf(stderr, "error: %s\n", strerror(errno));            
-            exit(0);
-        }
+		pthread_create(&client_id, NULL, client_thread, &client_fd);
 		
-		if(msg_rcv.type == Connect){
-			//printf("Connect\n");
-			//if id recieved is invalid send message to the client to try again
-			if(!check_ID_val(field_status.user, msg_rcv.id))
-			{
-				invalid_id.id = '-';
-				err = write(client_fd,
-						&invalid_id, sizeof(invalid_id));
-				if(err == -1)
-				{
-					fprintf(stderr, "error: %s\n", strerror(errno));            
-					exit(0);
-				}
-					
-			}
-			else
-			{
-				//if id is valid create a user
-				idx = create_user(field_status.user, map, msg_rcv.id, client_fd);
-				//if server full send message to the client to try again later
-				if(idx == N_Max_Players)
-				{
-					invalid_id.id = '/';
-					err = write(client_fd,
-						&invalid_id, sizeof(invalid_id));
-					if(err == -1)
-					{
-						fprintf(stderr, "error: %s\n", strerror(errno));            
-						exit(0);
-					}
-				}
-				//if server not full send ball information to the client
-				else
-				{
-					err = write(client_fd,
-						&field_status.user[idx], sizeof(field_status.user[idx]));
-					if(err == -1)
-					{
-						fprintf(stderr, "error: %s\n", strerror(errno));            
-						exit(0);
-					}
-					pthread_create(&client_id[idx], NULL, client_thread, &idx);
-				}
-			}	
-		}
 	}
 	endwin();
 	close(sock_fd);
