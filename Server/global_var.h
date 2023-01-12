@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <ncurses.h>
+#include <signal.h>
 #include "../common/defines.h"
 #include "../common/structs.h"
 
@@ -28,5 +29,6 @@ extern client_t invalid_id;
 extern int n_bots;
 extern WINDOW* my_win;
 extern WINDOW* message_win;
+extern pthread_mutex_t mut;
 
 #endif

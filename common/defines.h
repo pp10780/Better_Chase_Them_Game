@@ -9,6 +9,7 @@
 #define New_Prize 6000
 #define Bot_movement 7000
 #define Disconnect 8000
+#define Continue_game 9000
 
 #define N_Max_Players 10
 #define N_Max_Bots 10

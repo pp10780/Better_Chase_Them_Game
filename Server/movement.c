@@ -40,7 +40,7 @@ void update_user_pos(position_t* map, field_status_t* field_status, int* new_pos
 		
 		//if damaged player's health reaches 0 mark position as empty
 		if (field_status->user[map[new_pos[0]*WINDOW_SIZE + new_pos[1]].idx].hp == 0){
-			map[new_pos[0]*WINDOW_SIZE + new_pos[1]].occ_status = -1;
+			map[new_pos[0]*WINDOW_SIZE + new_pos[1]].occ_status = 1;
 		}
 	}
 	//if position occupied by prize, collect it and gain health equivalent to the prize's value

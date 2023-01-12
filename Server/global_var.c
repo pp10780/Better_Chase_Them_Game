@@ -12,3 +12,4 @@ client_t invalid_id;
 int n_bots = 0;
 WINDOW * my_win;
 WINDOW * message_win;
+pthread_mutex_t mut;

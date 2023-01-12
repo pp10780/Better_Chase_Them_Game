@@ -1,6 +1,29 @@
 #include "init_server.h"
 #include "movement.h"
 
+
+void broadcast()
+{
+	pthread_mutex_lock(&mut);
+	msg_send.type = Field_status;
+	msg_send.field_status = field_status;
+	for(int i = 0; i < N_Max_Players; i++)
+	{	
+		if (field_status.user[i].id != '-' && field_status.user[i].hp > 0)
+		{
+			err = write(field_status.user[i].fd, &msg_send,  sizeof(msg_send));
+			if(err == -1)
+			{
+				fprintf(stderr, "error: %s\n", strerror(errno));            
+				exit(0);
+			}
+		}
+	}
+	pthread_mutex_unlock(&mut);
+	
+}
+
+
 /******************************************************************************
  * draw_player()
  *
@@ -51,19 +74,20 @@ void draw_prize(WINDOW *win, prize_t * prize, int delete){
 
 void draw_map()
 {
+	pthread_mutex_lock(&mut);
 	for(int i = 0; i < 10; i++)
 	{
 		//delete previous players postions from main window
-		if(prev_field_status.user[i].id != '-' && prev_field_status.user[i].hp > 0){      
+		if(prev_field_status.user[i].id != '-'){      
 			draw_player(my_win, &prev_field_status.user[i], 0);        
 		}
 		//draw current player positions on the main window and players healths on message window
-		if(field_status.user[i].id != '-' && field_status.user[i].hp > 0){      
+		if(field_status.user[i].id != '-'){      
 			draw_player(my_win, &field_status.user[i], 1); 
 			mvwprintw(message_win, i+1,1,"Player: %c : HP: %d\n", field_status.user[i].id, field_status.user[i].hp);       
 		}
 		//delete dead players healths from message window
-		if(field_status.user[i].id != '-' && field_status.user[i].hp == 0)
+		if(field_status.user[i].id == '-')
 		{
 			mvwprintw(message_win, i+1,1,"                     ");
 		}
@@ -89,7 +113,10 @@ void draw_map()
 	wrefresh(message_win);
 
 	prev_field_status = field_status;
+	pthread_mutex_unlock(&mut);
 }
+
+
 
 void* prizes_thread()
 {
@@ -97,6 +124,7 @@ void* prizes_thread()
 	{
 		sleep(5);
 		create_prize(map, field_status.prize);
+		broadcast();
 		draw_map();
 	}
 }
@@ -124,6 +152,7 @@ void* bots_thread()
 			get_new_pos(new_pos, key);
 			update_bot_pos(map, &field_status, new_pos, i);
 		}
+		broadcast();
 		draw_map();
 
 	}
@@ -146,10 +175,25 @@ void init_map()
 	wrefresh(message_win);
 }
 
+void* countdown_thread(void * arg)
+{
+	int fd = *(int*) arg;
+	int* flag = (int*) arg;
+	sleep(10);
+	if(*flag != -1)
+	{
+		clear_user(&field_status.user[msg_rcv.idx], map);
+		close(fd);
+	}
+	pthread_exit(NULL);
+}
+
 void* client_thread(void * arg)
 {
 	int tmp_fd = *(int*) arg;
 	int index;
+	int continue_flag = tmp_fd;
+	pthread_t client_id;
 
 	while(1)
 	{
@@ -173,6 +217,7 @@ void* client_thread(void * arg)
 					exit(0);
 				}
 					
+				broadcast();
 			}
 			else
 			{
@@ -214,8 +259,16 @@ void* client_thread(void * arg)
 		err = read(field_status.user[index].fd, &msg_rcv, sizeof(msg_rcv));
 		if(err == -1)
 		{
-			fprintf(stderr, "error: %s\n", strerror(errno));            
-			exit(0);
+			if(errno = EBADF)
+			{
+				break;
+			}
+			else
+			{
+				fprintf(stderr, "error: %s\n", strerror(errno));            
+				exit(0);
+			}
+
 		}
 		if(msg_rcv.type == Ball_movement && field_status.user[msg_rcv.idx].hp <= 0)
 		{
@@ -228,7 +281,9 @@ void* client_thread(void * arg)
 				fprintf(stderr, "error: %s\n", strerror(errno));            
 				exit(0);
 			}
-			clear_user(&field_status.user[msg_rcv.idx], map);
+			pthread_create(&client_id, NULL, countdown_thread, &continue_flag);
+			//clear_user(&field_status.user[msg_rcv.idx], map);
+			//break;
 		}
 		//if message received Ball movement, process movement and respond with updated field status
 		else if(msg_rcv.type == Ball_movement)
@@ -238,30 +293,28 @@ void* client_thread(void * arg)
 			//printf("Ball Movement\n");
 			get_new_pos(new_pos, msg_rcv.key[0]);
 			update_user_pos(map, &field_status, new_pos, msg_rcv.idx);
-			msg_send.type = Field_status;
 			//mask other players indexes to avoid cheating
 			index_mask(&field_status);
-			msg_send.field_status = field_status;
-			err = write(field_status.user[index].fd,
-						&msg_send, sizeof(msg_send));
-			if(err == -1)
-			{
-				fprintf(stderr, "error: %s\n", strerror(errno));            
-				exit(0);
-			}
+			broadcast();
 		}
 		else if(msg_rcv.type == Disconnect)
 		{
 			//printf("Disconnect\n");
 			clear_user(&field_status.user[msg_rcv.idx], map);
-			
+			close(field_status.user[index].fd);
+			break;
 		}
-		else
+		else if(msg_rcv.type == Continue_game)
 		{
+			continue_flag = -1;
+			field_status.user[msg_rcv.idx].hp = 10;
+			map[field_status.user[index].pos[0]*WINDOW_SIZE + field_status.user[index].pos[1]].occ_status= 0;
 			//printf("Invalid message received\n");
 		}
 	}
-	close(client_fd);
+	
+
+	pthread_exit(NULL);
 }
 
 
@@ -273,7 +326,8 @@ int main(int argc, char** argv){
         printf("Invalid input arguments\nFORMAT: ./{EXECUTABLE} {IP_ADDRESS} {PORT} {N_BOTS}\n");
         exit(EXIT_FAILURE);
     }
-	
+
+	pthread_mutex_init(&mut, NULL);	
 	init_server(&field_status, map);
 	n_bots = atoi(argv[3]);
 
