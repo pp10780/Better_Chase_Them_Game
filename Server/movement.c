@@ -14,8 +14,9 @@
  * Description: Checks the status of the intended position for the player 
  *				and produces the correct outcome given the rules 
  *****************************************************************************/
-void update_user_pos(position_t* map, field_status_t* field_status, int* new_pos, int idx)
+int update_user_pos(position_t* map, field_status_t* field_status, int* new_pos, int idx)
 {
+	int index = -1;
 	//if position empty move the player to said position
 	if (map[new_pos[0]*WINDOW_SIZE + new_pos[1]].occ_status == -1) 
 	{	
@@ -41,6 +42,7 @@ void update_user_pos(position_t* map, field_status_t* field_status, int* new_pos
 		//if damaged player's health reaches 0 mark position as empty
 		if (field_status->user[map[new_pos[0]*WINDOW_SIZE + new_pos[1]].idx].hp == 0){
 			map[new_pos[0]*WINDOW_SIZE + new_pos[1]].occ_status = 1;
+			index = map[new_pos[0]*WINDOW_SIZE + new_pos[1]].idx;
 		}
 	}
 	//if position occupied by prize, collect it and gain health equivalent to the prize's value
@@ -67,6 +69,7 @@ void update_user_pos(position_t* map, field_status_t* field_status, int* new_pos
 		map[field_status->user[idx].pos[0]*WINDOW_SIZE + field_status->user[idx].pos[1]].idx = idx;
 	}	
 	//if occupied by bot remain in the same position, nothing else happens
+	return index;
 }
 
 
@@ -84,8 +87,10 @@ void update_user_pos(position_t* map, field_status_t* field_status, int* new_pos
  * Description: Checks the status of the intended position for the bot 
  *				and produces the correct outcome given the rules 
  *****************************************************************************/
-void update_bot_pos(position_t* map, field_status_t* field_status, int* new_pos, int idx)
-{	//if position empty move the bot to said position
+int update_bot_pos(position_t* map, field_status_t* field_status, int* new_pos, int idx)
+{	
+	int index = -1;
+	//if position empty move the bot to said position
 	if(map[new_pos[0]*WINDOW_SIZE + new_pos[1]].occ_status == -1) 
 	{	
 		//mark previous position as empty
@@ -105,8 +110,10 @@ void update_bot_pos(position_t* map, field_status_t* field_status, int* new_pos,
 		//if damaged player's health reaches 0 mark position as empty
 		if (field_status->user[map[new_pos[0]*WINDOW_SIZE + new_pos[1]].idx].hp == 0){
 			map[new_pos[0]*WINDOW_SIZE + new_pos[1]].occ_status= -1;
+			index = map[new_pos[0]*WINDOW_SIZE + new_pos[1]].idx;
 		}
 	//if position occupied either by prize or other bot nothing happens
 	}
+	return index;
 }
 

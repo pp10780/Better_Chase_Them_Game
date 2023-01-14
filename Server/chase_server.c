@@ -1,26 +1,26 @@
 #include "init_server.h"
 #include "movement.h"
 
+struct sigaction act;
+
 
 void broadcast()
 {
-	pthread_mutex_lock(&mut);
+	message_s2c msg_send;
 	msg_send.type = Field_status;
 	msg_send.field_status = field_status;
 	for(int i = 0; i < N_Max_Players; i++)
 	{	
 		if (field_status.user[i].id != '-' && field_status.user[i].hp > 0)
 		{
-			err = write(field_status.user[i].fd, &msg_send,  sizeof(msg_send));
-			if(err == -1)
+			err = send(field_status.user[i].fd, &msg_send,  sizeof(msg_send), MSG_NOSIGNAL);
+			if(err == -1 || err == 0)
 			{
-				fprintf(stderr, "error: %s\n", strerror(errno));            
-				exit(0);
+				perror("write: ");
+				continue;
 			}
 		}
 	}
-	pthread_mutex_unlock(&mut);
-	
 }
 
 
@@ -74,7 +74,6 @@ void draw_prize(WINDOW *win, prize_t * prize, int delete){
 
 void draw_map()
 {
-	pthread_mutex_lock(&mut);
 	for(int i = 0; i < 10; i++)
 	{
 		//delete previous players postions from main window
@@ -113,7 +112,6 @@ void draw_map()
 	wrefresh(message_win);
 
 	prev_field_status = field_status;
-	pthread_mutex_unlock(&mut);
 }
 
 
@@ -123,9 +121,11 @@ void* prizes_thread()
 	while(1)
 	{
 		sleep(5);
+		pthread_mutex_lock(&mut);
 		create_prize(map, field_status.prize);
 		broadcast();
 		draw_map();
+		pthread_mutex_unlock(&mut);
 	}
 }
 
@@ -144,6 +144,7 @@ void* bots_thread()
 	while(1)
 	{
 		sleep(3);
+		pthread_mutex_lock(&mut);
 		for(int i = 0; i < n_bots; i++){
 			key = random_key(i);
 			new_pos[0] = field_status.bot[i].pos[0];
@@ -154,7 +155,7 @@ void* bots_thread()
 		}
 		broadcast();
 		draw_map();
-
+		pthread_mutex_unlock(&mut);
 	}
 }
 
@@ -177,13 +178,12 @@ void init_map()
 
 void* countdown_thread(void * arg)
 {
-	int fd = *(int*) arg;
-	int* flag = (int*) arg;
+	int index = *(int*) arg;
+	int continue_flag = field_status.user[index].n_deaths;
 	sleep(10);
-	if(*flag != -1)
+	if(field_status.user[index].n_deaths == continue_flag)
 	{
-		clear_user(&field_status.user[msg_rcv.idx], map);
-		close(fd);
+		close(field_status.user[index].fd);
 	}
 	pthread_exit(NULL);
 }
@@ -192,15 +192,17 @@ void* client_thread(void * arg)
 {
 	int tmp_fd = *(int*) arg;
 	int index;
-	int continue_flag = tmp_fd;
+	int dead_idx;
 	pthread_t client_id;
+	message_c2s msg_rcv;
+	message_s2c msg_send;
 
 	while(1)
 	{
-		err = read(tmp_fd, &msg_rcv, sizeof(msg_rcv));
+		err = recv(tmp_fd, &msg_rcv, sizeof(msg_rcv), 0);
 		if(err == -1)
 		{
-			fprintf(stderr, "error: %s\n", strerror(errno));            
+			//fprintf(stderr, "read_client_thread: %s\n", strerror(errno));            
 			exit(0);
 		}
 		if(msg_rcv.type == Connect){
@@ -209,15 +211,14 @@ void* client_thread(void * arg)
 			if(!check_ID_val(field_status.user, msg_rcv.id))
 			{
 				invalid_id.id = '-';
-				err = write(tmp_fd,
-						&invalid_id, sizeof(invalid_id));
-				if(err == -1)
+				err = send(tmp_fd,
+						&invalid_id, sizeof(invalid_id), MSG_NOSIGNAL);
+				if(err == -1 || err == 0)
 				{
-					fprintf(stderr, "error: %s\n", strerror(errno));            
-					exit(0);
+					//fprintf(stderr, "write_connect_client_thread_1: %s\n", strerror(errno));            
+					close(field_status.user[index].fd);
+					pthread_exit(NULL);
 				}
-					
-				broadcast();
 			}
 			else
 			{
@@ -227,24 +228,31 @@ void* client_thread(void * arg)
 				if(index == N_Max_Players)
 				{
 					invalid_id.id = '/';
-					err = write(tmp_fd,
-						&invalid_id, sizeof(invalid_id));
-					if(err == -1)
+					err = send(tmp_fd,
+						&invalid_id, sizeof(invalid_id), MSG_NOSIGNAL);
+					if(err == -1 || err == 0)
 					{
-						fprintf(stderr, "error: %s\n", strerror(errno));            
-						exit(0);
+						//fprintf(stderr, "write_connect_client_thread_2: %s\n", strerror(errno));            
+						clear_user(&field_status.user[index], map);
+						close(field_status.user[index].fd);
+						pthread_exit(NULL);
 					}
 				}
 				//if server not full send ball information to the client
 				else
 				{
-					err = write(tmp_fd,
-						&field_status.user[index], sizeof(field_status.user[index]));
-					if(err == -1)
+					err = send(tmp_fd,
+						&field_status.user[index], sizeof(field_status.user[index]), MSG_NOSIGNAL);
+					if(err == -1 || err == 0)
 					{
-						fprintf(stderr, "error: %s\n", strerror(errno));            
-						exit(0);
+						//fprintf(stderr, "write_connect_client_thread_3: %s\n", strerror(errno));            
+						clear_user(&field_status.user[index], map);
+						close(field_status.user[index].fd);
+						pthread_exit(NULL);
 					}
+					pthread_mutex_lock(&mut);
+					broadcast();
+					pthread_mutex_unlock(&mut);
 					break;
 				}
 			}
@@ -253,72 +261,90 @@ void* client_thread(void * arg)
 	}
 
 	while(1)
-	{
-		draw_map();
+	{		
 		//if the health of the client trying to move alredy reached 0 send Health_0 message for it to disconnect and delete the user from the game
-		err = read(field_status.user[index].fd, &msg_rcv, sizeof(msg_rcv));
-		if(err == -1)
+		err = recv(field_status.user[index].fd, &msg_rcv, sizeof(msg_rcv), 0);
+		if(err == -1 || err == 0)
 		{
-			if(errno = EBADF)
+			//fprintf(stderr, "read_client_thread_1: %s\n", strerror(errno));   
+			clear_user(&field_status.user[index], map);
+			//prev_field_status = field_status;
+			pthread_mutex_lock(&mut);
+			draw_map();
+			broadcast();
+			pthread_mutex_unlock(&mut);
+			if(field_status.user[index].hp != 0)
 			{
-				break;
+				close(field_status.user[index].fd);
 			}
-			else
-			{
-				fprintf(stderr, "error: %s\n", strerror(errno));            
-				exit(0);
-			}
-
+			pthread_exit(NULL);
+			 
 		}
-		if(msg_rcv.type == Ball_movement && field_status.user[msg_rcv.idx].hp <= 0)
+		//if message received different than Continue_game and hp equal or below 0, invalid message received
+		else if(msg_rcv.type != Continue_game && field_status.user[index].hp <= 0)
 		{
-			//printf("Health_0\n");
-			msg_send.type = Health_0;
-			err = write(field_status.user[index].fd,
-						&msg_send, sizeof(msg_send));
-			if(err == -1)
-			{
-				fprintf(stderr, "error: %s\n", strerror(errno));            
-				exit(0);
-			}
-			pthread_create(&client_id, NULL, countdown_thread, &continue_flag);
-			//clear_user(&field_status.user[msg_rcv.idx], map);
-			//break;
+			break;
 		}
-		//if message received Ball movement, process movement and respond with updated field status
 		else if(msg_rcv.type == Ball_movement)
 		{
-			new_pos[0] = field_status.user[msg_rcv.idx].pos[0];
-			new_pos[1] = field_status.user[msg_rcv.idx].pos[1];
+			new_pos[0] = field_status.user[index].pos[0];
+			new_pos[1] = field_status.user[index].pos[1];
 			//printf("Ball Movement\n");
+			pthread_mutex_lock(&mut);
 			get_new_pos(new_pos, msg_rcv.key[0]);
-			update_user_pos(map, &field_status, new_pos, msg_rcv.idx);
+			dead_idx = update_user_pos(map, &field_status, new_pos, index);
+			pthread_mutex_unlock(&mut);
+			if(dead_idx != -1)
+			{
+				msg_send.type = Health_0;
+				err = send(field_status.user[dead_idx].fd,
+							&msg_send, sizeof(msg_send), MSG_NOSIGNAL);
+				if(err == -1 || err == 0)
+				{
+					//fprintf(stderr, "write_ball_movement_client_thread_1: %s\n", strerror(errno));            
+					clear_user(&field_status.user[dead_idx], map);
+					close(field_status.user[dead_idx].fd);
+				}
+				
+				pthread_create(&client_id, NULL, countdown_thread, &dead_idx);
+			}
 			//mask other players indexes to avoid cheating
 			index_mask(&field_status);
+			pthread_mutex_lock(&mut);
+			draw_map();
 			broadcast();
-		}
-		else if(msg_rcv.type == Disconnect)
-		{
-			//printf("Disconnect\n");
-			clear_user(&field_status.user[msg_rcv.idx], map);
-			close(field_status.user[index].fd);
-			break;
+			pthread_mutex_unlock(&mut);
 		}
 		else if(msg_rcv.type == Continue_game)
 		{
-			continue_flag = -1;
-			field_status.user[msg_rcv.idx].hp = 10;
+			field_status.user[index].n_deaths++;
+			field_status.user[index].hp = 10;
 			map[field_status.user[index].pos[0]*WINDOW_SIZE + field_status.user[index].pos[1]].occ_status= 0;
 			//printf("Invalid message received\n");
 		}
+		//If message type does not match any of the protocol messages, invalid message received delete 
+		else {
+			break;
+		}
 	}
-	
-
+	//prev_field_status = field_status;
+	clear_user(&field_status.user[index], map);
+	pthread_mutex_lock(&mut);
+	draw_map();
+	pthread_mutex_unlock(&mut);
+	close(field_status.user[index].fd);
 	pthread_exit(NULL);
 }
 
 
 int main(int argc, char** argv){
+
+    // set SIGPIPE action to ignore
+    memset(&act, 0, sizeof act);
+    act.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &act, NULL) == -1) {
+        fprintf(stderr, "error: %s\n", strerror(errno));
+    }
 	
 	pthread_t prize_id, bot_id, client_id;
 	if(argc != 4)
@@ -334,7 +360,7 @@ int main(int argc, char** argv){
 	//open socket for communication
 	sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock_fd == -1){
-		fprintf(stderr, "error: %s\n", strerror(errno)); 
+		fprintf(stderr, "socket: %s\n", strerror(errno)); 
 		exit(-1);
 	}
 
@@ -346,7 +372,7 @@ int main(int argc, char** argv){
 	err = bind(sock_fd, (struct sockaddr *)&local_addr,
 							sizeof(local_addr));
 	if(err == -1) {
-		fprintf(stderr, "error: %s\n", strerror(errno)); 
+		fprintf(stderr, "bind: %s\n", strerror(errno)); 
 		exit(-1);
 	}
 
@@ -356,6 +382,9 @@ int main(int argc, char** argv){
 	pthread_create(&bot_id, NULL, bots_thread, NULL);
 	init_map();
 	prev_field_status = field_status;
+	pthread_mutex_lock(&mut);
+	draw_map();
+	pthread_mutex_unlock(&mut);
 	
 	while(1){
 		

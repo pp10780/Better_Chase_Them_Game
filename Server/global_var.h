@@ -20,8 +20,6 @@
 extern field_status_t field_status, prev_field_status;
 extern position_t map[WINDOW_SIZE*WINDOW_SIZE];
 extern int sock_fd, client_fd;
-extern message_c2s msg_rcv;
-extern message_s2c msg_send;
 extern int err;
 extern int idx;
 extern int new_pos[2];

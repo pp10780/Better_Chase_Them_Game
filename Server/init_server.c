@@ -90,6 +90,7 @@ int create_user(client_t* user, position_t* map, char id, int fd){
 			user[i].fd = fd;
 			user[i].id = id;
 			user[i].idx = i;
+			user[i].n_deaths = 0;
 			generate_valid_pos(map, user[i].pos);
 			user[i].hp = 10;
 			map[user[i].pos[0]*WINDOW_SIZE + user[i].pos[1]].occ_status = 0;

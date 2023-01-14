@@ -24,6 +24,7 @@ typedef struct client_t
     int idx;
 	int hp;
     int pos[2];
+    int n_deaths;
 } client_t;
 
 typedef struct field_status_t

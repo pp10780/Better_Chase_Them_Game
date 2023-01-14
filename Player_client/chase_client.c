@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <arpa/inet.h>
-#include <time.h>
 
 #include "../common/defines.h"
 #include "../common/structs.h"
@@ -25,8 +24,7 @@ client_t personal_info;
 field_status_t field_status;
 field_status_t prev_field_status;
 pthread_t controller_id;
-int continue_flag = 1;
-time_t curr_time;
+int continue_flag = 0;
 
 /******************************************************************************
  * draw_player()
@@ -93,6 +91,48 @@ void init_prev_field(field_status_t* prev_field_status){
     }
 }
 
+void draw_map()
+{
+    for(int i = 0; i < 10; i++)
+	{
+		//delete previous players postions from main window
+		if(prev_field_status.user[i].id != '-'){      
+			draw_player(my_win, &prev_field_status.user[i], 0);        
+		}
+		//draw current player positions on the main window and players healths on message window
+		if(field_status.user[i].id != '-'){      
+			draw_player(my_win, &field_status.user[i], 1); 
+			mvwprintw(message_win, i+1,1,"Player: %c : HP: %d\n", field_status.user[i].id, field_status.user[i].hp);       
+		}
+		//delete dead players healths from message window
+		if(field_status.user[i].id == '-')
+		{
+			mvwprintw(message_win, i+1,1,"                     ");
+		}
+		//delete previous bot position from main window
+		if(prev_field_status.bot[i].id != '-'){
+			draw_player(my_win, &prev_field_status.bot[i], 0);   
+		}
+		//draw current bot positions on the main window
+		if (field_status.bot[i].id != '-')
+		{
+			draw_player(my_win, &field_status.bot[i], 1);   
+		}
+
+		//delete previous prize positions and draw current ones on the main window
+		if(field_status.prize[i].value != -1){      
+			draw_prize(my_win, &prev_field_status.prize[i], 0);
+			draw_prize(my_win, &field_status.prize[i], 1);        
+		}
+
+	}
+	box(my_win, 0 , 0);
+	wrefresh(my_win);
+	wrefresh(message_win);
+
+	prev_field_status = field_status;
+}
+
 
 
 void* controller_thread(void* arg)
@@ -101,23 +141,18 @@ void* controller_thread(void* arg)
     {
         //get key input from user
         key = wgetch(my_win);
-        if(time(0) - curr_time > 10 && continue_flag == 0)
-        {
-            break;
-        }
         //if the input is a directional key send a ball movement message
-        if ((key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN) && continue_flag == 0){
-            continue_flag = 1;
+        if (continue_flag == 1){
+            continue_flag = 0;
             msg_send.type = Continue_game;
             msg_send.id = personal_info.id;
             msg_send.idx = personal_info.idx;
 
-            err = write(server_fd, &msg_send, sizeof(msg_send));
-            if(err == -1)
+            err = send(server_fd, &msg_send, sizeof(msg_send), MSG_NOSIGNAL);
+            if(err == -1 || err == 0)
             {
-                endwin();  
+                endwin();
                 fprintf(stderr, "error: %s\n", strerror(errno));          
-                exit(0);
             }
             
         }
@@ -127,28 +162,20 @@ void* controller_thread(void* arg)
             msg_send.id = personal_info.id;
             msg_send.idx = personal_info.idx;
 
-            err = write(server_fd, &msg_send, sizeof(msg_send));
-            if(err == -1)
+            err = send(server_fd, &msg_send, sizeof(msg_send), MSG_NOSIGNAL);
+            if(err == -1 || err == 0)
             {
-                endwin();  
+                endwin();
+                printf("BOASWRITE");  
                 fprintf(stderr, "error: %s\n", strerror(errno));          
-                exit(0);
+                break;
             }
             
         }
         //if the input is the q key send a disconnect message
-        else if(key == 'q')
+        else if(key == 'q' || key == 'Q')
         {
-            msg_send.type = Disconnect;
-            msg_send.idx = personal_info.idx;
-            err = write(server_fd, &msg_send, sizeof(msg_send));
-            if(err == -1)
-            {
-                endwin();  
-                fprintf(stderr, "error: %s\n", strerror(errno));           
-                exit(0);
-            }
-             break;
+            break;
         }
     }
     close(server_fd);
@@ -203,15 +230,15 @@ int main(int argc, char** argv){
             continue;
         }
 
-        err = write(server_fd, &msg_send, sizeof(msg_send));                
-        if(err == -1)
+        err = send(server_fd, &msg_send, sizeof(msg_send), MSG_NOSIGNAL);                
+        if(err == -1 || err == 0)
         {
             fprintf(stderr, "error: %s\n", strerror(errno));            
             exit(0);
         }
         
-	    err = read(server_fd, &client, sizeof(client));
-        if(err == -1)
+	    err = recv(server_fd, &client, sizeof(client), 0);
+        if(err == -1 || err == 0)
         {
             fprintf(stderr, "error: %s\n", strerror(errno));            
             exit(0);
@@ -250,7 +277,7 @@ int main(int argc, char** argv){
 	wrefresh(my_win);
     keypad(my_win, true);
     /* creates a window and draws a border */
-    message_win = newwin(20, 70, WINDOW_SIZE, 0);
+    message_win = newwin(N_Max_Players + 1, 70, WINDOW_SIZE, 0);
 	wrefresh(message_win);
 
     draw_player(my_win, &personal_info, 1);
@@ -262,72 +289,23 @@ int main(int argc, char** argv){
 
     pthread_create(&controller_id, NULL, controller_thread, NULL);
 	while(1){
-		err = read(server_fd, &msg_rcv, sizeof(msg_rcv));
-        if(err == -1)
+		err = recv(server_fd, &msg_rcv, sizeof(msg_rcv), 0);
+        if(err == -1 || err == 0)
         {
-            
-            if(errno == EPIPE || errno == EBADF)
-            {
-                //close(server_fd);
-                break;
-            }
-            else
-            {
-                endwin();
-                fprintf(stderr, "error: %s\n", strerror(errno));    
-                exit(0);
-            }
-
+            perror("read: ");
+            break;
         }
         //if message recived is a field status update the window 
         if(msg_rcv.type == Field_status){
         
             field_status = msg_rcv.field_status;
-            for(int i = 0; i < 10; i++)
-            {
-                //delete previous players postions from main window
-                if(prev_field_status.user[i].id != '-'){      
-                    draw_player(my_win, &prev_field_status.user[i], 0);        
-                }
-                //draw current player positions on the main window and players healths on message window
-                if(field_status.user[i].id != '-'){      
-                    draw_player(my_win, &field_status.user[i], 1); 
-                    mvwprintw(message_win, i+1,1,"Player: %c : HP: %d\n", field_status.user[i].id, field_status.user[i].hp);       
-                }
-                //delete dead players healths from message window
-                if(field_status.user[i].id == '-')
-                {
-                    mvwprintw(message_win, i+1,1,"                     ");
-                }
-                //delete previous bot position from main window
-                if(prev_field_status.bot[i].id != '-'){
-                    draw_player(my_win, &prev_field_status.bot[i], 0);   
-                }
-                //draw current bot positions on the main window
-                if (field_status.bot[i].id != '-')
-                {
-                    draw_player(my_win, &field_status.bot[i], 1);   
-                }
-
-                //delete previous prize positions and draw current ones on the main window
-                if(field_status.prize[i].value != -1){      
-                    draw_prize(my_win, &prev_field_status.prize[i], 0);
-                    draw_prize(my_win, &field_status.prize[i], 1);        
-                }
-
-                
-            }
-            box(my_win, 0 , 0);
-            wrefresh(my_win);
-            wrefresh(message_win);
-
-
-            prev_field_status = field_status;
+            draw_map();
         }
         //if health_0 message recieved print you died on message window
         else if(msg_rcv.type == Health_0){
-            continue_flag = 0;
-            curr_time = time(0);
+            field_status = msg_rcv.field_status;
+            draw_map();
+            continue_flag = 1;
             mvwprintw(message_win, 0,1,"Continue?\n");      
 
             mvwprintw(message_win, 1,1,
@@ -344,7 +322,6 @@ int main(int argc, char** argv){
                 "\t              /_____/  /___/   /_____/   /_____/     \n"
                 "\t                                                     \n");
             wrefresh(message_win);	
-            sleep(2);
             //break;
         }
 	}
@@ -352,23 +329,21 @@ int main(int argc, char** argv){
     //endwin();
     //touchwin(message_win);
     //if player died or disconncted print game over on message window and disconnect
-    mvwprintw(message_win, 1,1,
-         "\t   ______    ___     __  ___    ______                     \n"
-         "\t  / ____/   /   |   /  |/  /   / ____/                     \n"
-         "\t / / __    / /| |  / /|_/ /   / __/                        \n"
-         "\t/ /_/ /   / ___ | / /  / /   / /___                        \n"
-         "\t\\____/   /_/  |_|/_/  /_/   /_____/                       \n"
-         "\t                                                           \n"
-         "\t                        ____  _    __    ______    ____    \n"
-         "\t                       / __ \\| |  / /   / ____/   / __ \\ \n"
-         "\t                      / / / /| | / /   / __/     / /_/ /   \n"
-         "\t                     / /_/ / | |/ /   / /___    / _, _/    \n"
-         "\t                     \\____/  |___/   /_____/   /_/ |_|    \n"
-         "\t                                                        \n");
+    // mvwprintw(message_win, 1,1,
+    //      "\t   ______    ___     __  ___    ______                     \n"
+    //      "\t  / ____/   /   |   /  |/  /   / ____/                     \n"
+    //      "\t / / __    / /| |  / /|_/ /   / __/                        \n"
+    //      "\t/ /_/ /   / ___ | / /  / /   / /___                        \n"
+    //      "\t\\____/   /_/  |_|/_/  /_/   /_____/                       \n"
+    //      "\t                                                           \n"
+    //      "\t                        ____  _    __    ______    ____    \n"
+    //      "\t                       / __ \\| |  / /   / ____/   / __ \\ \n"
+    //      "\t                      / / / /| | / /   / __/     / /_/ /   \n"
+    //      "\t                     / /_/ / | |/ /   / /___    / _, _/    \n"
+    //      "\t                     \\____/  |___/   /_____/   /_/ |_|    \n"
+    //      "\t                                                        \n");
     wrefresh(message_win);	
     sleep(2);
     endwin();
-
-    //close(server_fd);
 	exit(0);
 }

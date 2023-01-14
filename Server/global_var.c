@@ -3,8 +3,6 @@
 field_status_t field_status, prev_field_status;
 position_t map[WINDOW_SIZE*WINDOW_SIZE];
 int sock_fd, client_fd;
-message_c2s msg_rcv;
-message_s2c msg_send;
 int err;
 int idx = 0;
 int new_pos[2];
