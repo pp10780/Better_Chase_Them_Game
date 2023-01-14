@@ -1,9 +1,6 @@
 #include "init_server.h"
 #include "movement.h"
 
-struct sigaction act;
-
-
 void broadcast()
 {
 	message_s2c msg_send;
@@ -338,13 +335,6 @@ void* client_thread(void * arg)
 
 
 int main(int argc, char** argv){
-
-    // set SIGPIPE action to ignore
-    memset(&act, 0, sizeof act);
-    act.sa_handler = SIG_IGN;
-    if (sigaction(SIGPIPE, &act, NULL) == -1) {
-        fprintf(stderr, "error: %s\n", strerror(errno));
-    }
 	
 	pthread_t prize_id, bot_id, client_id;
 	if(argc != 4)
