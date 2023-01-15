@@ -25,7 +25,7 @@ server: $(OBJS0) $(LFLAGS)
 	$(CC) -g $(OBJS0) -o $(OUT0) -lpthread -lncurses
 
 client: $(OBJS1) $(LFLAGS)
-	$(CC) -g $(OBJS1) -o $(OUT1) -lncurses
+	$(CC) -g $(OBJS1) -o $(OUT1) -lpthread -lncurses
 
 
 $(OBJDIR)/chase_server.o: $(SRCDIR0)/chase_server.c
