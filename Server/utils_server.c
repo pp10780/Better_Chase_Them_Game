@@ -149,6 +149,7 @@ void index_mask(){
 	for(int i = 0; i < N_Max_Players - n_bots - N_Max_Prizes; i++)
 	{
 		field_status.user[i].idx = -1;
-		field_status.bot[i].idx = -1;
+		if(i<10)
+			field_status.bot[i].idx = -1;
 	}
 }

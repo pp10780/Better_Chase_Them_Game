@@ -187,7 +187,7 @@ void* controller_thread(void* arg)
         }
         else if (key == KEY_LEFT || key == KEY_RIGHT || key == KEY_UP || key == KEY_DOWN){
             msg_send.type = Ball_movement;
-            msg_send.key[0] = key;
+            msg_send.key = key;
             msg_send.id = personal_info.id;
             msg_send.idx = personal_info.idx;
 

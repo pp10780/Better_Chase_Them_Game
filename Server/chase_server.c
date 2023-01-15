@@ -17,6 +17,12 @@ int main(int argc, char** argv){
 	init_server();
 	n_bots = atoi(argv[3]);
 
+	if(n_bots < 0 || n_bots > N_Max_Bots)
+	{
+		printf("Invalid number of bots chosen! Please choose a number between 0 and 10.\n");
+		exit(0);
+	}
+
 	//open socket for communication
 	sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock_fd == -1){

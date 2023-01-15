@@ -44,11 +44,10 @@ typedef struct message_s2c
 
 typedef struct message_c2s
 {
-    int n_bots;
     int type;
     int idx;
     char id;
-    int key[N_Max_Bots];
+    int key;
 } message_c2s;
 
 #endif

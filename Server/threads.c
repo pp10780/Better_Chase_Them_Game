@@ -159,6 +159,7 @@ void* client_thread(void * arg)
 					}
 					pthread_mutex_lock(&mut);
 					broadcast();
+					draw_map();
 					pthread_mutex_unlock(&mut);
 					break;
 				}
@@ -200,7 +201,7 @@ void* client_thread(void * arg)
 			new_pos[0] = field_status.user[index].pos[0];
 			new_pos[1] = field_status.user[index].pos[1];
 			
-			get_new_pos(new_pos, msg_rcv.key[0]);
+			get_new_pos(new_pos, msg_rcv.key);
 			pthread_mutex_lock(&mut);
 			dead_idx = update_user_pos(new_pos, index);
 			pthread_mutex_unlock(&mut);
