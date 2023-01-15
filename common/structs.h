@@ -29,9 +29,9 @@ typedef struct client_t
 
 typedef struct field_status_t
 {
-    client_t user[10];
-    prize_t prize[10];
-    client_t bot[10];
+    client_t user[N_Max_Players];
+    prize_t prize[N_Max_Prizes];
+    client_t bot[N_Max_Bots];
 }field_status_t;
 
 
@@ -48,7 +48,7 @@ typedef struct message_c2s
     int type;
     int idx;
     char id;
-    int key[10];
+    int key[N_Max_Bots];
 } message_c2s;
 
 #endif

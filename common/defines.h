@@ -12,7 +12,7 @@
 #define Continue_game 9000
 #define Dead_Ball 10000
 
-#define N_Max_Players 10
+#define N_Max_Players (WINDOW_SIZE - 2)*(WINDOW_SIZE - 2)
 #define N_Max_Bots 10
 #define N_Max_Prizes 10
 

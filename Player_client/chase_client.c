@@ -91,8 +91,30 @@ void init_prev_field(field_status_t* prev_field_status){
     }
 }
 
+/******************************************************************************
+ * draw_map()
+ *
+ * Arguments:  
+ * Returns: 
+ *
+ * Description: Draws the map to be displayed on the window
+ *****************************************************************************/
 void draw_map()
 {
+        mvwprintw(message_win, 1,1,
+    "                                                       \n"
+    "                                                           \n"
+    "                                                               \n"
+    "                                                               \n"
+    "                                                               \n"
+    "                                                      \n"
+    "                                                     \n"
+    "                                                     \n"
+    "                                                    \n"
+    "                                                     \n"
+    "                                                     \n"
+    "                                                     \n"
+    "                                                     \n");
     for(int i = 0; i < 10; i++)
 	{
 		//delete previous players postions from main window
@@ -134,7 +156,15 @@ void draw_map()
 }
 
 
-
+/******************************************************************************
+ *controller_thread()
+ *
+ * Arguments: 
+ * Returns: 
+ *
+ * Description: Function that receives inputs from user and sends them to the 
+ *              server. Runs on a seperate thread. 
+ *****************************************************************************/
 void* controller_thread(void* arg)
 {
     while(1)
@@ -151,8 +181,7 @@ void* controller_thread(void* arg)
             err = send(server_fd, &msg_send, sizeof(msg_send), MSG_NOSIGNAL);
             if(err == -1 || err == 0)
             {
-                endwin();
-                fprintf(stderr, "error: %s\n", strerror(errno));          
+                endwin();     
             }
             
         }
@@ -165,9 +194,7 @@ void* controller_thread(void* arg)
             err = send(server_fd, &msg_send, sizeof(msg_send), MSG_NOSIGNAL);
             if(err == -1 || err == 0)
             {
-                endwin();
-                printf("BOASWRITE");  
-                fprintf(stderr, "error: %s\n", strerror(errno));          
+                endwin();     
                 break;
             }
             
@@ -292,7 +319,8 @@ int main(int argc, char** argv){
 		err = recv(server_fd, &msg_rcv, sizeof(msg_rcv), 0);
         if(err == -1 || err == 0)
         {
-            perror("read: ");
+            //perror("read: ");
+            pthread_cancel(controller_id);
             break;
         }
         //if message recived is a field status update the window 
@@ -304,9 +332,8 @@ int main(int argc, char** argv){
         //if health_0 message recieved print you died on message window
         else if(msg_rcv.type == Health_0){
             field_status = msg_rcv.field_status;
-            draw_map();
-            continue_flag = 1;
-            mvwprintw(message_win, 0,1,"Continue?\n");      
+            //draw_map();
+            continue_flag = 1;      
 
             mvwprintw(message_win, 1,1,
                 "\t__  __   ____    __  __                              \n"
@@ -321,27 +348,42 @@ int main(int argc, char** argv){
                 "\t               / /_/ /  _/ /    / /___    / /_/ /    \n"
                 "\t              /_____/  /___/   /_____/   /_____/     \n"
                 "\t                                                     \n");
-            wrefresh(message_win);	
-            //break;
-        }
-	}
+                wrefresh(message_win);
+            sleep(2);
+            
 
-    //endwin();
-    //touchwin(message_win);
+            mvwprintw(message_win, 1,1,
+            "  ______            __  _                     ___     \n"
+            "  / ____/___  ____  / /_(_)___  __  _____     /__ \\    \n"
+            " / /   / __ \\/ __ \\/ __/ / __ \\/ / / / _ \\     / _/    \n"
+            "/ /___/ /_/ / / / / /_/ / / / / /_/ /  __/    /_/      \n"
+            "\\____/\\____/_/ /_/\\__/_/_/ /_/\\__,_/\\___/    (_)       \n"
+            "                                                      \n"
+            "                                                     \n"
+            "                                                     \n"
+            "                                                     \n"
+            "                                                     \n"
+            "                                                     \n"
+            "                                                     \n"
+            "                                                     \n");
+            
+            wrefresh(message_win);	
+        } 
+	}
     //if player died or disconncted print game over on message window and disconnect
-    // mvwprintw(message_win, 1,1,
-    //      "\t   ______    ___     __  ___    ______                     \n"
-    //      "\t  / ____/   /   |   /  |/  /   / ____/                     \n"
-    //      "\t / / __    / /| |  / /|_/ /   / __/                        \n"
-    //      "\t/ /_/ /   / ___ | / /  / /   / /___                        \n"
-    //      "\t\\____/   /_/  |_|/_/  /_/   /_____/                       \n"
-    //      "\t                                                           \n"
-    //      "\t                        ____  _    __    ______    ____    \n"
-    //      "\t                       / __ \\| |  / /   / ____/   / __ \\ \n"
-    //      "\t                      / / / /| | / /   / __/     / /_/ /   \n"
-    //      "\t                     / /_/ / | |/ /   / /___    / _, _/    \n"
-    //      "\t                     \\____/  |___/   /_____/   /_/ |_|    \n"
-    //      "\t                                                        \n");
+    mvwprintw(message_win, 1,1,
+         "\t   ______    ___     __  ___    ______                     \n"
+         "\t  / ____/   /   |   /  |/  /   / ____/                     \n"
+         "\t / / __    / /| |  / /|_/ /   / __/                        \n"
+         "\t/ /_/ /   / ___ | / /  / /   / /___                        \n"
+         "\t\\____/   /_/  |_|/_/  /_/   /_____/                       \n"
+         "\t                                                           \n"
+         "\t                        ____  _    __    ______    ____    \n"
+         "\t                       / __ \\| |  / /   / ____/   / __ \\ \n"
+         "\t                      / / / /| | / /   / __/     / /_/ /   \n"
+         "\t                     / /_/ / | |/ /   / /___    / _, _/    \n"
+         "\t                     \\____/  |___/   /_____/   /_/ |_|    \n"
+         "\t                                                        \n");
     wrefresh(message_win);	
     sleep(2);
     endwin();

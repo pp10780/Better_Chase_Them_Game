@@ -2,15 +2,56 @@
 #include <ncurses.h>
 
 /******************************************************************************
+ * broadcast()
+ *
+ * Arguments: 
+ * Returns:
+ *
+ * Description: Sends field status update to all connected users
+ *****************************************************************************/
+void broadcast()
+{
+	message_s2c msg_send;
+	msg_send.type = Field_status;
+	msg_send.field_status = field_status;
+	for(int i = 0; i < N_Max_Players; i++)
+	{	
+		if (field_status.user[i].id != '-' && field_status.user[i].hp > 0)
+		{
+			err = send(field_status.user[i].fd, &msg_send,  sizeof(msg_send), MSG_NOSIGNAL);
+			if(err == -1 || err == 0)
+			{
+				continue;
+			}
+		}
+	}
+}
+
+/******************************************************************************
+ * random_key()
+ *
+ * Arguments: idx - index of the bot in the struct
+ * Returns: A random directional key
+ *
+ * Description: Generates a random key for the movement of the bot 
+ *****************************************************************************/
+int random_key(int idx)
+{
+    srand(time(NULL) + idx);
+    int keys[4] = {KEY_DOWN, KEY_RIGHT, KEY_UP, KEY_LEFT};
+
+    return keys[random()%4];   
+}
+
+/******************************************************************************
  * generate_valid_pos()
  *
- * Arguments: map - array with the info of all map positions
- *			  pos - array that has the x and y coordinates of player/bot/prize
+ * Arguments: pos - array that has the x and y coordinates of player/bot/prize
  * Returns:
  *
  * Description: Indicates an open position in the map
  *****************************************************************************/
-void generate_valid_pos(position_t* map, int* pos){
+void generate_valid_pos(int* pos){
 	int val_pos = 0;
 	srand(time(0));
 
@@ -62,16 +103,15 @@ void get_new_pos(int* pos, int key)
 /******************************************************************************
  * clear_user()
  *
- * Arguments: client - struct with all the client's info
- *            map - array with the info of all map positions
+ * Arguments: index - index of the intended user on the users array
  * Returns:
  *
  * Description: Removes the user after it dies or disconnects
  *****************************************************************************/
-void clear_user(client_t* user, position_t* map)
+void clear_user(int index)
 {
-	map[user->pos[0]*WINDOW_SIZE + user->pos[1]].occ_status = -1;
-	user->id = '-';
+	map[field_status.user[index].pos[0]*WINDOW_SIZE + field_status.user[index].pos[1]].occ_status = -1;
+	field_status.user[index].id = '-';
 }
 
 /******************************************************************************
@@ -99,17 +139,16 @@ int check_ID_val(client_t* client, char id)
 /******************************************************************************
  * index_mask()
  *
- * Arguments: field_status - struct with all the info related to the clients 
- * 							 and prizes
+ * Arguments: 
  * Returns:
  *
  * Description: Hides the indexes of the clients before sending the struct to
                 the player, to avoid cheating
  *****************************************************************************/
-void index_mask(field_status_t* field_status){
-	for(int i = 0; i < 10; i++)
+void index_mask(){
+	for(int i = 0; i < N_Max_Players - n_bots - N_Max_Prizes; i++)
 	{
-		field_status->user[i].idx = -1;
-		field_status->bot[i].idx = -1;
+		field_status.user[i].idx = -1;
+		field_status.bot[i].idx = -1;
 	}
 }
