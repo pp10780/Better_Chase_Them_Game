@@ -216,9 +216,9 @@ void* client_thread(void * arg)
 				//if there is an error in send eliminate player and close thread
 				if(err == -1 || err == 0)
 				{          
-				pthread_mutex_lock(&mut);
-				clear_user(index);
-				pthread_mutex_unlock(&mut);
+					pthread_mutex_lock(&mut);
+					clear_user(field_status.user[dead_idx]);
+					pthread_mutex_unlock(&mut);
 					close(field_status.user[dead_idx].fd);
 				}
 				//creates a thread where the player is eliminated after 10 seconds if no Continue message is received
