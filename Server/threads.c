@@ -53,8 +53,10 @@ void* bots_thread()
 			update_bot_pos(new_pos, i);
 			pthread_mutex_unlock(&mut);
 		}
+		pthread_mutex_lock(&mut);
 		broadcast();
 		draw_map();
+		pthread_mutex_unlock(&mut);
 		
 	}
 }
