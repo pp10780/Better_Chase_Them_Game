@@ -96,9 +96,11 @@ void* countdown_thread(void * arg)
 void* client_thread(void * arg)
 {
 	int tmp_fd = *(int*) arg;
+	int err;
 	int index;
 	int dead_idx;
 	int new_pos[2];
+	client_t invalid_id;
 	pthread_t countdown_id;
 	message_c2s msg_rcv;
 	message_s2c msg_send;

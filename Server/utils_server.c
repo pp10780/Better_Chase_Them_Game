@@ -11,6 +11,7 @@
  *****************************************************************************/
 void broadcast()
 {
+	int err;
 	message_s2c msg_send;
 	msg_send.type = Field_status;
 	msg_send.field_status = field_status;

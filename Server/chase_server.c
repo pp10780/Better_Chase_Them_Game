@@ -7,6 +7,9 @@
 int main(int argc, char** argv){
 	
 	pthread_t prize_id, bot_id, client_id;
+	int err;
+	int sock_fd, client_fd;
+	
 	if(argc != 4)
     {
         printf("Invalid input arguments\nFORMAT: ./{EXECUTABLE} {IP_ADDRESS} {PORT} {N_BOTS}\n");

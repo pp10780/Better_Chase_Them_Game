@@ -14,16 +14,12 @@
 
 WINDOW * my_win;
 WINDOW * message_win;
-int key = -1;
-int err;
-int client_fd, server_fd;
+int server_fd;
 message_c2s msg_send;
 message_s2c msg_rcv;
-client_t client;
 client_t personal_info;
 field_status_t field_status;
 field_status_t prev_field_status;
-pthread_t controller_id;
 int continue_flag = 0;
 
 /******************************************************************************
@@ -167,6 +163,8 @@ void draw_map()
  *****************************************************************************/
 void* controller_thread(void* arg)
 {
+    int key = -1;
+    int err;
     while(1)
     {
         //get key input from user
@@ -211,6 +209,9 @@ void* controller_thread(void* arg)
 
 int main(int argc, char** argv){
 
+    int err;
+    client_t client;
+    pthread_t controller_id;
     //check if program was lauched using the right number of arguments
     if(argc != 3)
     {
